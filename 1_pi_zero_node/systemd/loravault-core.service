@@ -1,0 +1,16 @@
+# Pragmatic: Always ensure system availability on edge devices via systemd respawning.
+[Unit]
+Description=LoRaVault Hardware Core Loop
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/1_pi_zero_node/main_core.py
+WorkingDirectory=/home/pi/1_pi_zero_node/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=5
+User=pi
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRaVault Setup</title>
+    <!-- Krug's Law: Design for Scanning. No CSS files, brutalist inline UI. -->
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f4f5; color: #18181b; text-align: center; }
+        h1 { font-size: 24px; }
+        p { font-size: 16px; color: #52525b; }
+        /* Krug's Law: Make clickable things obviously clickable */
+        .btn-massive {
+            display: block; width: 100%; max-width: 400px; margin: 20px auto; padding: 25px;
+            font-size: 24px; font-weight: bold; color: white; background-color: #2563eb;
+            border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .btn-massive:active { background-color: #1d4ed8; transform: translateY(2px); }
+        #status { margin-top: 20px; font-weight: bold; color: #16a34a; }
+    </style>
+</head>
+<body>
+    <!-- Trunk Test: User instantly knows where they are and what to do -->
+    <h1>LoRaVault Field Config</h1>
+    <p>Connected via local Hotspot (192.168.4.1)</p>
+    
+    <button class="btn-massive" onclick="tareScale()">Zero the Scale (Tare)</button>
+    <p id="status"></p>
+
+    <script>
+        // Pragmatic: Fast, obvious fetch call with immediate feedback
+        function tareScale() {
+            const btn = document.querySelector('.btn-massive');
+            btn.innerText = "Processing...";
+            
+            fetch('/api/tare', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('status').innerText = "✅ Scale is now zeroed.";
+                btn.innerText = "Zero the Scale (Tare)";
+            }).catch(err => {
+                document.getElementById('status').innerText = "❌ Error connecting to hardware.";
+                btn.innerText = "Zero the Scale (Tare)";
+                document.getElementById('status').style.color = "#dc2626";
+            });
+        }
+    </script>
+</body>
+</html>

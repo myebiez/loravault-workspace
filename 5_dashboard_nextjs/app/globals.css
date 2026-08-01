@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Following Krug's Rule 8 (Visual Hierarchy & Noise): 
+   Moved away from the dark-mode "hacker" aesthetic. 
+   High contrast (dark text on light gray) is scientifically faster to scan. */
+body {
+  @apply bg-gray-100 text-gray-900 antialiased;
+}

@@ -1,0 +1,7 @@
+RPi.GPIO==0.7.1
+pyserial==3.5
+hx711==1.1.2.3
+spidev==3.6
+mfrc522==0.0.7
+Flask==3.0.0
+python-dotenv==1.0.0
