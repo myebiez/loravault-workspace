@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Activity, AlertTriangle } from 'lucide-react';
 
 export default function RealtimeIndicator() {
   const [isConnected, setIsConnected] = useState(false);
@@ -22,18 +21,22 @@ export default function RealtimeIndicator() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Following Krug's 3rd Law (Omit Needless Words) and 1st Law (Don't Make Me Think):
-  // Removed the text "System Status:". A pill badge is a universally understood convention for system health.
+  // DOET: Immediate visual feedback. Clean, professional beacon.
   return (
-    <div className="flex items-center text-sm font-bold tracking-wide uppercase">
+    <div className="flex items-center">
       {isConnected ? (
-        <span className="flex items-center bg-green-100 text-green-800 px-3 py-1 rounded-full border border-green-200">
-          <Activity className="w-4 h-4 mr-2" /> Live Connection
-        </span>
+        <div className="flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full ring-1 ring-inset ring-emerald-500/20">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider">System Live</span>
+        </div>
       ) : (
-        <span className="flex items-center bg-red-100 text-red-800 px-3 py-1 rounded-full border border-red-200">
-          <AlertTriangle className="w-4 h-4 mr-2" /> Disconnected
-        </span>
+        <div className="flex items-center space-x-2 bg-rose-50 text-rose-700 px-3 py-1.5 rounded-full ring-1 ring-inset ring-rose-500/20">
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+          <span className="text-xs font-bold uppercase tracking-wider">Disconnected</span>
+        </div>
       )}
     </div>
   );
