@@ -41,13 +41,24 @@ def register():
         # Menghapus cache temporary agar tidak tersubmit dua kali
         if os.path.exists("/tmp/last_rfid.txt"):
             os.remove("/tmp/last_rfid.txt")
-        return jsonify({"status": "success", "message": f"Karyawan ID {nik} didaftarkan lokal dan siap Sync!"})
+        return jsonify({"status": "success", "message": f"Karyawan ID {nik} masuk antrean Sync!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/tare', methods=['POST'])
 def tare_scale():
-    return jsonify({"status": "success", "message": "Timbangan berhasil di-nol-kan."})
+    """
+    IPC (Inter-Process Communication) Sederhana.
+    Menulis flag file untuk dibaca oleh vault_loop.py tanpa memblokir thread web.
+    """
+    try:
+        with open("/tmp/tare_flag", "w") as f:
+            f.write("1")
+        return jsonify({"status": "success", "message": "Perintah kalibrasi dikirim ke hardware."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Gagal mengirim perintah: {e}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
+    # Security by Default: Menurunkan privilege dengan tidak menggunakan port 80 (Root).
+    port = int(os.getenv("FLASK_PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
