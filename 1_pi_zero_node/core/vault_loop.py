@@ -1,5 +1,4 @@
 import time
-import os
 import RPi.GPIO as GPIO
 from hardware.rfid_reader import RFIDScanner
 from hardware.indicators import Indicator
@@ -18,23 +17,22 @@ class VaultSystem:
         self.auth_db = LocalAuthDB()
 
     def _write_last_tap_for_web(self, uid: str):
-        """IPC Sederhana: Menyimpan UID terakhir agar UI Web Flask dapat melakukan Auto-Fill."""
+        """IPC Sederhana: Menyimpan UID terakhir di SQLite agar UI Web Flask dapat melakukan Auto-Fill."""
         try:
-            with open("/tmp/last_rfid.txt", "w") as f:
-                f.write(str(uid))
-        except Exception:
-            pass
+            self.auth_db.set_last_rfid(uid)
+        except Exception as e:
+            print(f"[IPC Error] Gagal mencatat last tap ke database: {e}")
 
     def _check_tare_flag(self):
-        """IPC Sederhana: Membaca flag dari Web UI untuk melakukan kalibrasi hardware."""
-        if os.path.exists("/tmp/tare_flag"):
-            print("[Hardware] Kalibrasi Timbangan (Tare) dieksekusi...")
-            self.scale.hx.tare()
-            try:
-                os.remove("/tmp/tare_flag")
-            except OSError:
-                pass
-            self.indicator.success()
+        """IPC Sederhana: Membaca flag atomik dari SQLite untuk melakukan kalibrasi hardware."""
+        try:
+            # check_and_clear_tare_flag() melakukan DELETE atomik dan mengembalikan True jika berhasil
+            if self.auth_db.check_and_clear_tare_flag():
+                print("[Hardware] Perintah Tare (Kalibrasi) dari Web UI dieksekusi...")
+                self.scale.hx.tare()
+                self.indicator.success()
+        except Exception as e:
+            print(f"[IPC Error] Gagal mengecek tare flag: {e}")
 
     def _sync_offline_registrations(self):
         """Memancarkan data user baru ke gateway saat sedang idle dan menunggu ACK."""
@@ -53,7 +51,7 @@ class VaultSystem:
         print("LoRaVault Core Active. Awaiting RFID...")
         try:
             while True:
-                # 1. Cek perintah kalibrasi dari UI (Mencegah blocking)
+                # 1. Cek perintah kalibrasi dari UI (Atomic DB Check)
                 self._check_tare_flag()
                 
                 # 2. Background Sync Protocol dengan Guaranteed Delivery (ACK)
