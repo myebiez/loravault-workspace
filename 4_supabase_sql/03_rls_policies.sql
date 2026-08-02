@@ -31,3 +31,27 @@ CREATE POLICY "Command Center read users" ON users FOR SELECT TO anon, authentic
 CREATE POLICY "Command Center read assets" ON assets FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Command Center read logs" ON transactions_log FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Command Center read loans" ON active_loans FOR SELECT TO anon, authenticated USING (true);
+
+-- ==============================================================================
+-- 3. VISUAL AUDIT STORAGE POLICIES (PI 3 CAMERA)
+-- ==============================================================================
+-- Inisialisasi Bucket Publik untuk menyimpan bukti foto dari Pi 3
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('audit_snapshots', 'audit_snapshots', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Mengunci akses objek storage (Secure by default)
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Policy 1: Mengizinkan Node 3 (Kamera Pi 3) untuk mengunggah (INSERT) foto
+-- Node 3 menggunakan anon key, dibatasi HANYA ke bucket 'audit_snapshots'
+CREATE POLICY "Camera Node can upload snapshots" 
+ON storage.objects FOR INSERT 
+TO anon, authenticated 
+WITH CHECK (bucket_id = 'audit_snapshots');
+
+-- Policy 2: Mengizinkan Dasbor Next.js untuk membaca (SELECT) foto publik
+CREATE POLICY "Dashboard can view snapshots" 
+ON storage.objects FOR SELECT 
+TO anon, authenticated 
+USING (bucket_id = 'audit_snapshots');
