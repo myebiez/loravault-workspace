@@ -35,6 +35,7 @@ CREATE TABLE transactions_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rfid_uid TEXT NOT NULL,
     weight_delta NUMERIC NOT NULL,
+    evidence_url TEXT, -- VISUAL AUDIT TRAIL: Link ke Supabase Storage (S3 Bucket)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
     -- Relasi FK: Gunakan RESTRICT agar data log audit/finansial tidak cacat jika user dihapus
     CONSTRAINT fk_user FOREIGN KEY (rfid_uid) REFERENCES users(rfid_uid) ON DELETE RESTRICT
