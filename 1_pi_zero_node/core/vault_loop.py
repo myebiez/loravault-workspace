@@ -1,5 +1,6 @@
 import time
 import os
+import RPi.GPIO as GPIO
 from hardware.rfid_reader import RFIDScanner
 from hardware.indicators import Indicator
 from hardware.servo import VaultLatch
@@ -24,23 +25,41 @@ class VaultSystem:
         except Exception:
             pass
 
+    def _check_tare_flag(self):
+        """IPC Sederhana: Membaca flag dari Web UI untuk melakukan kalibrasi hardware."""
+        if os.path.exists("/tmp/tare_flag"):
+            print("[Hardware] Kalibrasi Timbangan (Tare) dieksekusi...")
+            self.scale.hx.tare()
+            try:
+                os.remove("/tmp/tare_flag")
+            except OSError:
+                pass
+            self.indicator.success()
+
     def _sync_offline_registrations(self):
-        """Memancarkan data user baru ke gateway saat sedang idle."""
+        """Memancarkan data user baru ke gateway saat sedang idle dan menunggu ACK."""
         unsynced = self.auth_db.get_unsynced_users()
         for uid, nik in unsynced:
-            print(f"Air-Gapped Sync: Mendaftarkan NIK {nik}...")
-            self.lora.send_registration(uid, nik)
-            self.auth_db.mark_synced(uid)
+            print(f"Air-Gapped Sync: Mencoba mendaftarkan NIK {nik}...")
+            # Hanya tandai sukses jika ESP32 mengirim balasan ACK secara eksplisit
+            if self.lora.send_registration_with_ack(uid, nik):
+                print(f"ACK Diterima! {nik} tersinkronisasi secara persisten.")
+                self.auth_db.mark_synced(uid)
+            else:
+                print(f"Gagal Sync {nik}. Menunggu siklus berikutnya.")
             time.sleep(1) # Jeda antar pancaran agar buffer LoRa aman
 
     def run(self):
         print("LoRaVault Core Active. Awaiting RFID...")
         try:
             while True:
-                # 1. Background Sync Protocol
+                # 1. Cek perintah kalibrasi dari UI (Mencegah blocking)
+                self._check_tare_flag()
+                
+                # 2. Background Sync Protocol dengan Guaranteed Delivery (ACK)
                 self._sync_offline_registrations()
                 
-                # 2. Wait for tap
+                # 3. Wait for tap
                 uid = self.rfid.wait_for_tap()
                 if not uid:
                     time.sleep(0.5)
@@ -49,14 +68,14 @@ class VaultSystem:
                 print(f"RFID Terdeteksi: {uid}")
                 self._write_last_tap_for_web(uid) # Trigger auto-fill UI
                 
-                # 3. ZERO-TRUST SECURITY: Validasi Lokal Terketat
+                # 4. ZERO-TRUST SECURITY: Validasi Lokal Terketat
                 if not self.auth_db.is_valid_uid(uid):
                     print("Akses Ditolak: Kartu Tidak Dikenal.")
                     self.indicator.error() # Tembakkan alarm penolakan fisik
                     time.sleep(1.5)
                     continue
                 
-                # 4. Akses Sah -> Operasional Standar
+                # 5. Akses Sah -> Operasional Standar
                 self.indicator.success()
                 self.latch.unlock()
                 
@@ -69,10 +88,14 @@ class VaultSystem:
                 delta = weight_after - weight_before
                 print(f"Weight Delta: {delta}g")
                 
-                # 5. Kirim Telemetri ke Gateway
+                # 6. Kirim Telemetri ke Gateway (Fire-and-forget, data fisik bersifat redundant)
                 self.lora.send_telemetry(uid, delta)
                 time.sleep(2)
                         
         except KeyboardInterrupt:
+            print("System halted by user.")
+        finally:
+            # Pragmatic Programmer: Safe shutdown to prevent hardware damage or open locks
             self.latch.lock()
-            print("System halted.")
+            GPIO.cleanup()
+            print("GPIO Cleaned up. Vault Locked.")
