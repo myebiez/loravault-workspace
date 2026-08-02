@@ -13,7 +13,8 @@ class TelegramNotifier:
         url = f"{self.base_url}/sendPhoto"
         try:
             with open(image_path, 'rb') as photo:
-                payload = {"chat_id": Config.TELEGRAM_CHAT_ID, "caption": message}
+                # parse_mode 'Markdown' enables bolding and code blocks for Executive scannability
+                payload = {"chat_id": Config.TELEGRAM_CHAT_ID, "caption": message, "parse_mode": "Markdown"}
                 files = {"photo": photo}
                 response = requests.post(url, data=payload, files=files, timeout=10)
                 response.raise_for_status()

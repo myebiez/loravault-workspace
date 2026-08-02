@@ -14,7 +14,11 @@ class CloudListener:
 
     def _get_latest_transaction(self):
         # CLRS: Database retrieval bounded to \mathcal{O}(1) time by leveraging LIMIT 1.
-        response = self.supabase.table("transactions_log").select("*").order("created_at", desc=True).limit(1).execute()
+        # SSOT Update: We now JOIN with users and hr_employees to get the real identity.
+        response = self.supabase.table("transactions_log").select(
+            "id, rfid_uid, weight_delta, created_at, users(nik, hr_employees(full_name, department))"
+        ).order("created_at", desc=True).limit(1).execute()
+        
         return response.data[0] if response.data else None
 
     def _poll(self):
@@ -29,7 +33,7 @@ class CloudListener:
             except Exception as e:
                 print(f"[Supabase Polling Error]: {e}")
             
-            time.sleep(2) # Polling interval
+            time.sleep(1.5) # Polling interval optimized for responsiveness
 
     def start(self):
         self._running = True
