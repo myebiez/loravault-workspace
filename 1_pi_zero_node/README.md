@@ -1,30 +1,30 @@
 <div align="center">
   <img src="https://img.shields.io/badge/NODE-01_THE_EDGE-18181b?style=for-the-badge" alt="Node 1">
+  <img src="https://img.shields.io/badge/SECURITY-ZERO_TRUST-dc2626?style=for-the-badge" alt="Zero Trust">
   <img src="https://img.shields.io/badge/HARDWARE-PI_ZERO_W-c51a4a?style=for-the-badge" alt="Raspberry Pi">
-  <img src="https://img.shields.io/badge/LANGUAGE-PYTHON_3-3776ab?style=for-the-badge" alt="Python">
   
   <h1>🛡️ Node 1: The Headless Edge</h1>
-  <p><b>Autonomous Vault Controller & Physical State Machine</b></p>
+  <p><b>Zero-Trust Vault Controller, Offline Auth & Physical State Machine</b></p>
 </div>
 
 ---
 
 ## 💼 The Executive Summary (Operational Value)
 
-**Node 1** adalah otak fisik (Dunia Bawah Tanah) dari arsitektur LoRaVault. Beroperasi 100% *offline* di dalam cangkang baja brankas, modul ini sama sekali tidak bergantung pada koneksi internet gedung. 
+**Node 1** adalah otak fisik (Dunia Bawah Tanah) dari arsitektur LoRaVault. Beroperasi 100% *offline* di dalam cangkang baja brankas, modul ini tidak bergantung pada koneksi internet gedung. 
 
-Tugas utamanya adalah memvalidasi identitas (*RFID*), mengukur perubahan massa aset menggunakan hukum fisika (*LoadCell*), mengontrol akses pintu (*Servo*), dan menembakkan data telemetri tersebut menembus baja menggunakan radio **LoRa 868MHz**. Node ini adalah implementasi murni dari *Zero-Trust Security*; jika seluruh jaringan pabrik lumpuh, brankas ini tetap beroperasi dan terlindungi.
+Pembaruan arsitektur terbaru menerapkan **Zero-Trust Security**. Node ini sekarang memiliki *database* SQLite mandiri untuk mengotentikasi kartu. Akses pintu terkunci mutlak bagi kartu yang tidak terdaftar. Node ini juga mampu melakukan *Air-Gapped Sync*, mengirimkan paket pendaftaran NIK (`REG`) dan paket telemetri massa (`TLM`) menembus beton menggunakan teknik **LoRa Multiplexing**.
 
 ---
 
 ## 🏛️ Filosofi Arsitektur (Engineering Rigor)
 
+- **Single Source of Truth (SSOT):** Menghindari redundansi data HRD. Node 1 hanya mengaitkan UID RFID dengan NIK (Nomor Induk Karyawan) institusi. Translasi nama dan jabatan ditangani murni di level *Cloud*.
 - **SICP (Abstraksi Barrier):** File `__init__.py` pada direktori `hardware/` dan `core/` dibiarkan KOSONG. Kesederhanaan adalah bentuk abstraksi terbaik, berfungsi murni sebagai penanda modul tanpa mencampuradukkan *global state*.
-- **CLRS (Efisiensi Asimtotik):** Pembacaan sensor beban menolak penggunaan rata-rata (*mean*) yang rentan terhadap lonjakan *noise*. Sistem mengimplementasikan algoritma *Median* dengan kompleksitas $\mathcal{O}(N \log N)$ untuk membuang anomali perangkat keras secara matematis.
-- **The Pragmatic Programmer (Reversibility):** DILARANG KERAS menyolder modul komputasi utama (Pi Zero, HX711, RFID) secara permanen ke PCB. Sistem wajib menggunakan *Female Pin Header* untuk memastikan *hardware swap* dapat dilakukan dalam hitungan detik.
-- **DOET (Signifiers & Feedback):** 
-  - Kabel internal mematuhi *Natural Mapping*: Merah = 5V, Oranye/Kuning = 3.3V, Hitam = GND.
-  - Interaksi pengguna langsung dibalas secara fisik: Sukses (LED Hijau + Beep Pendek), Gagal/Anomali (LED Merah + Beep Panjang).
+- **CLRS (Efisiensi Asimtotik):** 
+  - *Sensor:* Mengimplementasikan algoritma *Median* dengan kompleksitas $\mathcal{O}(N \log N)$ untuk membuang anomali getaran hardware.
+  - *Database:* Pencarian izin akses UID beroperasi dalam waktu $\mathcal{O}(\log N)$ memanfaatkan *Primary Key Indexing* pada SQLite.
+- **DOET (Signifiers & Feedback):** Interaksi pengguna langsung dibalas secara fisik: Sukses (LED Hijau + Beep Pendek), Gagal/Ditolak (LED Merah + Beep Panjang).
 
 ---
 
@@ -39,15 +39,39 @@ graph LR
         Core -- "PWM" --> Lock[Servo Latch]
         Core -- "UART" --> LoRa[LoRa SX1262]
         Core -- "GPIO" --> DOET[LEDs & Buzzer]
+        DB[(Local SQLite)] -. "Auth & Sync" .- Core
     end
-    LoRa -. "868MHz Radio Wave" .-> Ext[Node 2: ESP32 Gateway]
+    LoRa -. "Multiplexed 868MHz (REG/TLM)" .-> Ext[Node 2: ESP32 Gateway]
     
     classDef hardware fill:#27272a,stroke:#52525b,color:#fff;
     classDef core fill:#be123c,stroke:#9f1239,color:#fff;
+    classDef db fill:#0ea5e9,stroke:#0369a1,color:#fff;
     class RFID,Scale,Lock,LoRa,DOET hardware;
     class Core core;
+    class DB db;
 
 ```
+
+---
+
+## 🪪 Panduan Operasional: Pendaftaran Akses Pegawai
+
+Karena sistem berada di ruang kedap internet, pendaftaran kartu karyawan baru dilakukan melalui portal lokal (*Air-Gapped*).
+
+1. **Koneksi ke Brankas:** Teknisi/Admin Keamanan menyalakan Wi-Fi di *smartphone* atau laptop dan terhubung ke Hotspot mandiri yang dipancarkan oleh Pi Zero (contoh SSID: `LoRaVault_Setup`).
+2. **Akses Portal Web:** Buka *browser* dan akses alamat IP `http://192.168.4.1`.
+3. **Tap & Auto-Fill:**
+* Tempelkan kartu RFID baru ke area sensor di luar brankas.
+* Kolom `UID Kartu` di layar *smartphone* akan terisi secara otomatis (*auto-fill*).
+
+
+4. **Input Data Tunggal:** Masukkan NIK / NIM / ID Pegawai yang sah ke dalam kolom yang tersedia.
+5. **Simpan & Selesai:** Tekan tombol **"Kaitkan Kartu & ID"**.
+* *Hasil Lokal:* Pintu brankas kini akan mengenali dan bisa dibuka oleh kartu tersebut seketika itu juga.
+* *Hasil Global:* Di belakang layar (*background*), Pi Zero akan menembakkan sinyal LoRa ke atas tanah untuk mendaftarkan NIK tersebut ke Server Pusat (*Supabase*).
+
+
+
 ---
 
 ## 🛠️ Cetak Biru Perangkat Keras (Perfboard / PCB Bolong)
@@ -55,8 +79,6 @@ graph LR
 Karena *breadboard* rentan terhadap getaran fisik (*high contact resistance*), Node 1 **wajib** dirakit di atas *Perfboard*.
 
 ### 1. Rel Daya (Power Bus)
-
-Buat 3 jalur tembaga padat di sisi bawah PCB:
 
 * **Rel 5V:** Terhubung ke Pin Fisik 2 atau 4 (Pi Zero).
 * **Rel 3.3V:** Terhubung ke Pin Fisik 1 atau 17 (Pi Zero).
@@ -71,7 +93,7 @@ Buat 3 jalur tembaga padat di sisi bawah PCB:
 
 ### 3. Isolasi Elektromagnetik (LoRa SX1262)
 
-Modul LoRa memancarkan *noise* RF tingkat tinggi saat transmisi, yang dapat mendistorsi pembacaan mikrovoltase pada chip HX711.
+Modul LoRa memancarkan *noise* RF tingkat tinggi saat transmisi.
 
 * **Aturan Penempatan:** Pasang soket LoRa sejauh 5-10 cm dari modul HX711 pada PCB.
 * **Wiring LoRa:** VCC $\rightarrow$ Rel 3.3V | GND $\rightarrow$ Rel GND | TX $\rightarrow$ Pin 10 | RX $\rightarrow$ Pin 8 | M0 $\rightarrow$ Pin 15 | M1 $\rightarrow$ Pin 13.
@@ -80,7 +102,7 @@ Modul LoRa memancarkan *noise* RF tingkat tinggi saat transmisi, yang dapat mend
 
 ## 🚀 Setup & Deployment (Systemd Daemon)
 
-Node ini bersifat *Headless Plug-and-Play* (Krug's 1st Law). Saat listrik menyala, sistem langsung bekerja tanpa perlu monitor atau *keyboard*. Eksekusi perintah berikut via SSH:
+Node ini bersifat *Headless Plug-and-Play* (Krug's 1st Law). Eksekusi perintah berikut via SSH:
 
 ### Langkah 1: Aktivasi Interface Perangkat Keras
 
@@ -97,7 +119,7 @@ sudo reboot
 
 ```bash
 sudo apt-get update
-sudo apt-get install python3-pip python3-venv -y
+sudo apt-get install python3-pip python3-venv sqlite3 -y
 sudo pip3 install -r /home/pi/1_pi_zero_node/requirements.txt
 ```
 
@@ -108,19 +130,12 @@ sudo pip3 install -r /home/pi/1_pi_zero_node/requirements.txt
 sudo cp /home/pi/1_pi_zero_node/systemd/loravault-core.service /etc/systemd/system/
 sudo cp /home/pi/1_pi_zero_node/systemd/loravault-web.service /etc/systemd/system/
 
-# Muat ulang daemon Linux
+# Muat ulang daemon Linux & Aktifkan
 sudo systemctl daemon-reload
-
-# Aktifkan untuk berjalan otomatis saat Pi Zero menyala
 sudo systemctl enable loravault-core.service
 sudo systemctl enable loravault-web.service
 
 # Eksekusi sekarang juga
 sudo systemctl start loravault-core.service
 sudo systemctl start loravault-web.service
-
-# Verifikasi (Pastikan berwarna hijau/Active)
-sudo systemctl status loravault-core.service
 ```
-
----
