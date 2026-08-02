@@ -6,10 +6,11 @@ export default function TransactionLog() {
   const [logs, setLogs] = useState<any[]>([]);
 
   const fetchLogs = async () => {
+    // Menambahkan `evidence_url` ke dalam query pemanggilan data
     const { data, error } = await supabase
       .from('transactions_log')
       .select(`
-        id, created_at, rfid_uid, weight_delta,
+        id, created_at, rfid_uid, weight_delta, evidence_url,
         users (
           nik,
           hr_employees ( full_name )
@@ -24,7 +25,12 @@ export default function TransactionLog() {
     fetchLogs();
     const channel = supabase.channel('realtime_logs')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions_log' }, () => {
-        fetchLogs(); // Re-fetch to get relational HR data on new insert
+        // Fetch ulang agar kita mendapatkan URL foto yang baru saja di-UPDATE oleh Pi 3
+        fetchLogs(); 
+      })
+      // Dengarkan juga event UPDATE jika Pi 3 sedikit terlambat mengunggah foto setelah baris di-INSERT
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions_log' }, () => {
+        fetchLogs(); 
       })
       .subscribe();
 
@@ -43,7 +49,6 @@ export default function TransactionLog() {
           const isTaken = log.weight_delta < -15;
           const isReturned = log.weight_delta > 15;
           
-          // Krug's Law: Don't make me guess what the numbers mean.
           let actionText = 'Guncangan / Akses Ditolak';
           let badgeColor = 'bg-slate-100 text-slate-600 ring-slate-200';
           
@@ -55,7 +60,6 @@ export default function TransactionLog() {
             badgeColor = 'bg-emerald-50 text-emerald-700 ring-emerald-200/60';
           }
 
-          // SSOT Identity resolution
           const employeeName = log.users?.hr_employees?.full_name;
           const displayName = employeeName || 'Kartu Tidak Terdaftar';
           const isUnregistered = !employeeName;
@@ -77,10 +81,26 @@ export default function TransactionLog() {
               </div>
               
               <div className="flex items-center justify-end space-x-3">
+                {/* VISUAL EVIDENCE BUTTON - DOET: Scannable and clickable affordance */}
+                {log.evidence_url && (
+                  <a 
+                    href={log.evidence_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center space-x-1 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 transition-colors"
+                    title="Lihat Bukti Foto"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Foto</span>
+                  </a>
+                )}
+                
                 <span className="text-slate-500 font-mono text-xs tabular-nums w-16 text-right">
                   {log.weight_delta > 0 ? '+' : ''}{log.weight_delta}g
                 </span>
-                {/* DOET Signifier: Badge with strict, unmissable semantic color */}
                 <span className={`px-2.5 py-1 text-xs font-bold rounded-md ring-1 ring-inset ${badgeColor} w-24 text-center`}>
                   {actionText}
                 </span>
