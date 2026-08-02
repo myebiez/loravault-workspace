@@ -16,19 +16,17 @@ def index():
 
 @app.route('/api/last_tap', methods=['GET'])
 def last_tap():
-    """Mengambil UID terakhir dari sensor fisik secara aman."""
+    """Mengambil UID terakhir dari database SQLite IPC secara atomik."""
     try:
-        if os.path.exists("/tmp/last_rfid.txt"):
-            with open("/tmp/last_rfid.txt", "r") as f:
-                uid = f.read().strip()
-                return jsonify({"uid": uid})
-    except Exception:
-        pass
-    return jsonify({"uid": ""})
+        uid = auth_db.get_last_rfid()
+        return jsonify({"uid": uid})
+    except Exception as e:
+        print(f"[Web API Error] Gagal membaca last tap: {e}")
+        return jsonify({"uid": ""})
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    """Mendaftarkan NIK ke DB lokal dan menandainya untuk Sinkronisasi LoRa."""
+    """Mendaftarkan NIK ke DB lokal, menandainya untuk Sync LoRa, dan membersihkan cache UI."""
     data = request.json
     uid = data.get("uid")
     nik = data.get("nik")
@@ -38,9 +36,8 @@ def register():
         
     try:
         auth_db.register_user(uid, nik)
-        # Menghapus cache temporary agar tidak tersubmit dua kali
-        if os.path.exists("/tmp/last_rfid.txt"):
-            os.remove("/tmp/last_rfid.txt")
+        # Membersihkan cache UID terakhir di SQLite agar UI tidak terisi otomatis dengan UID yang sama
+        auth_db.clear_last_rfid()
         return jsonify({"status": "success", "message": f"Karyawan ID {nik} masuk antrean Sync!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -48,12 +45,11 @@ def register():
 @app.route('/api/tare', methods=['POST'])
 def tare_scale():
     """
-    IPC (Inter-Process Communication) Sederhana.
-    Menulis flag file untuk dibaca oleh vault_loop.py tanpa memblokir thread web.
+    IPC (Inter-Process Communication) Atomik via SQLite.
+    Menulis tare_flag ke tabel ipc_state tanpa memblokir thread HTTP response.
     """
     try:
-        with open("/tmp/tare_flag", "w") as f:
-            f.write("1")
+        auth_db.set_tare_flag()
         return jsonify({"status": "success", "message": "Perintah kalibrasi dikirim ke hardware."})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Gagal mengirim perintah: {e}"}), 500
