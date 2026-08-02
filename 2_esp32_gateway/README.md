@@ -70,25 +70,25 @@ build_flags =
 3. Hubungkan ESP32 ke PC via USB.
 4. Klik ikon **Tanda Panah Kanan (→)** untuk melakukan proses *Upload / Flash*. (Tahan tombol `BOOT` pada ESP32 jika muncul pesan *Connecting...*).
 
+
 ### Langkah 3: Verifikasi Log (Serial Monitor)
 
-Klik ikon **Steker (🔌)** di bilah bawah untuk membuka Serial Monitor (Baudrate 115200). Anda harus melihat respons berikut:
+Klik ikon **Steker (🔌)** di bilah bawah untuk membuka Serial Monitor (Baudrate 115200). 
 
+Ketika ada pendaftaran pegawai baru (Air-Gapped Sync), log akan menampilkan:
 ```text
-=== LoRaVault ESP32 Gateway Active ===
-[WiFi] Connecting to AP...
-[WiFi] Connected! IP: 192.168.1.50
-[LoRa] UART Interface Initialized (9600 8N1)
-```
-
-Ketika ada aksi dari brankas, log akan menampilkan:
-
-```text
-[LoRa] Valid Packet Extracted -> UID: 9876543210 | Delta: -1532.00g
-[Supabase] Executing POST request...
+[LoRa] REG Diterima -> UID: 9876543210 | NIK: EMP-2026-001
+[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/users](https://xxx.supabase.co/rest/v1/users)
 [Supabase] Success! Payload accepted. HTTP 201
 ```
 
+Ketika ada aksi peminjaman/pengembalian aset fisik, log akan menampilkan:
+
+```text
+[LoRa] TLM Diterima -> UID: 9876543210 | Delta: -1532.00g
+[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/transactions_log](https://xxx.supabase.co/rest/v1/transactions_log)
+[Supabase] Success! Payload accepted. HTTP 201
+```
 ---
 
 *Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).*
