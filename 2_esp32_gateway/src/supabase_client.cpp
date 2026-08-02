@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 #include "supabase_client.h"
 
-// SICP: Procedural Abstraction mapping the hardware layer directly into the REST layer.
+// SICP: Prosedur tunggal yang bertindak sebagai Smart Router
 void sendToSupabase(const LoRaPacket& packet) {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[Supabase] Abort: WiFi disconnected. Cannot bridge payload.");
@@ -10,31 +10,49 @@ void sendToSupabase(const LoRaPacket& packet) {
     }
 
     HTTPClient http;
-    // Route matches our upcoming PostgreSQL schema
-    String endpoint = String(SUPABASE_URL) + "/rest/v1/transactions_log";
+    String endpoint = String(SUPABASE_URL);
+    
+    // 1. Tentukan Endpoint Berdasarkan Tipe Paket
+    if (packet.type == TELEMETRY) {
+        endpoint += "/rest/v1/transactions_log";
+    } else if (packet.type == REGISTRATION) {
+        endpoint += "/rest/v1/users";
+    } else {
+        return; // Abaikan jika tipe tidak diketahui
+    }
     
     http.begin(endpoint);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("apikey", SUPABASE_KEY);
     http.addHeader("Authorization", "Bearer " + String(SUPABASE_KEY));
-    http.addHeader("Prefer", "return=representation"); // Returns the inserted row
+    http.addHeader("Prefer", "return=representation");
 
-    // Pragmatic Programmer: DRY Memory Management.
-    // Static allocation prevents heap fragmentation on the ESP32.
-    StaticJsonDocument<200> doc;
-    doc["rfid_uid"] = packet.uid;
-    doc["weight_delta"] = packet.weightDelta;
+    // 2. Rakit JSON Payload secara dinamis (Memory-safe di ESP32)
+    StaticJsonDocument<256> doc;
+    
+    if (packet.type == TELEMETRY) {
+        doc["rfid_uid"] = packet.uid;
+        doc["weight_delta"] = packet.weightDelta;
+    } else if (packet.type == REGISTRATION) {
+        doc["rfid_uid"] = packet.uid;
+        doc["nik"] = packet.nik; // Kirim NIK ke Cloud
+    }
     
     String requestBody;
     serializeJson(doc, requestBody);
 
-    Serial.println("[Supabase] Executing POST request...");
+    // 3. Tembakkan ke Supabase API
+    Serial.println("[Supabase] Executing POST to: " + endpoint);
     int httpResponseCode = http.POST(requestBody);
 
     if (httpResponseCode >= 200 && httpResponseCode < 300) {
         Serial.println("[Supabase] Success! Payload accepted. HTTP " + String(httpResponseCode));
-    } else {
-        // Error Recovery: Provide actionable feedback.
+    } 
+    // Penanganan anggun jika UID sudah pernah tersinkron (Conflict / 409)
+    else if (packet.type == REGISTRATION && httpResponseCode == 409) {
+        Serial.println("[Supabase] Notice: UID " + packet.uid + " sudah tersinkronisasi di Cloud.");
+    } 
+    else {
         Serial.println("[Supabase] POST Failed! HTTP " + String(httpResponseCode) + 
                        " | Reason: " + http.errorToString(httpResponseCode));
     }
