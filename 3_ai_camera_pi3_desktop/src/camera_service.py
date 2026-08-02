@@ -9,19 +9,19 @@ class CameraService:
 
     def capture_image(self, transaction_id):
         # SICP: Procedural Abstraction mapping to the OS shell layer.
-        # Uses standard libcamera-jpeg for modern Raspberry Pi OS compatibility (CSI port).
+        # Menggunakan rpicam-jpeg (pengganti libcamera-jpeg di RPi OS Bookworm)
         # CLRS: \mathcal{O}(1) system call bounded by physical shutter speed constraints (1000ms).
         filepath = f"{self.output_dir}/audit_{transaction_id}.jpg"
         try:
             subprocess.run([
-                "libcamera-jpeg", 
+                "rpicam-jpeg", 
                 "-o", filepath, 
-                "-t", "1000",          # 1 second warmup
+                "-t", "1000",          # 1 detik pemanasan sensor (warmup)
                 "--width", "1280", 
                 "--height", "720",
                 "--nopreview"
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return filepath
         except subprocess.CalledProcessError:
-            print("[Hardware Error] Camera capture failed. Is Arducam connected?")
+            print("[Hardware Error] rpicam-jpeg failed. Is Arducam connected?")
             return None

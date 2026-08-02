@@ -75,9 +75,9 @@ class AuditDashboard:
         full_name = hr_data.get("full_name", "UNKNOWN (UNREGISTERED CARD)")
         dept = hr_data.get("department", "No Dept")
 
-        # Logic Filter: Is it taken, returned, or noise?
-        is_taken = delta < -15
-        is_returned = delta > 15
+        # Logic Filter: Standarisasi Threshold 15g agar selaras dengan Supabase Trigger
+        is_taken = delta <= -15
+        is_returned = delta >= 15
         
         # Norman's DOET: Clear Signifiers mapped to physical state.
         if is_taken:
