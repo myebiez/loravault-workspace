@@ -36,8 +36,8 @@ CREATE TABLE transactions_log (
     rfid_uid TEXT NOT NULL,
     weight_delta NUMERIC NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-    -- Relasi FK (Tidak wajib CASCADE agar log historis tidak hilang jika user resign)
-    CONSTRAINT fk_user FOREIGN KEY (rfid_uid) REFERENCES users(rfid_uid) ON DELETE SET NULL
+    -- Relasi FK: Gunakan RESTRICT agar data log audit/finansial tidak cacat jika user dihapus
+    CONSTRAINT fk_user FOREIGN KEY (rfid_uid) REFERENCES users(rfid_uid) ON DELETE RESTRICT
 );
 
 -- 5. TABEL PEMINJAMAN AKTIF (State Aset Berjalan)
@@ -67,3 +67,12 @@ INSERT INTO hr_employees (nik, full_name, department) VALUES
 INSERT INTO assets (name, baseline_weight_g, tolerance_g) VALUES 
 ('Mesin Bor Bosch', 1500, 20),
 ('Tang Ampere', 350, 10);
+
+-- ==============================================================================
+-- SUPABASE 2026 EXPLICIT GRANTS
+-- ==============================================================================
+-- Mencegah akses default yang ditiadakan di versi terbaru Supabase PostgreSQL.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT ON hr_employees, users, assets, transactions_log, active_loans TO anon, authenticated;
+-- (Hak INSERT dicabut dari 'anon' publik. Semua operasi penulisan kini WAJIB 
+-- melewati fungsi RPC SECURITY DEFINER dengan injeksi token HMAC).
