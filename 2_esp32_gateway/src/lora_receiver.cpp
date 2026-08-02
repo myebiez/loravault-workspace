@@ -10,26 +10,43 @@ void setupLoRa() {
 }
 
 LoRaPacket receiveLoRaPacket() {
-    LoRaPacket packet = {"", 0.0, false};
+    LoRaPacket packet = {UNKNOWN, "", 0.0, "", false};
     
     if (Serial2.available()) {
         // CLRS: \mathcal{O}(N) time complexity where N is the characters in the buffer.
-        // We use string traversal to extract the payload strictly matching our private protocol.
         String raw = Serial2.readStringUntil('\n');
         raw.trim();
         
-        int separatorIdx = raw.indexOf('|');
-        if (separatorIdx > 0) {
-            packet.uid = raw.substring(0, separatorIdx);
-            packet.weightDelta = raw.substring(separatorIdx + 1).toFloat();
-            packet.valid = true;
+        int firstPipe = raw.indexOf('|');
+        if (firstPipe > 0) {
+            String prefix = raw.substring(0, firstPipe);
             
-            // DOET: Feedback. Log clear success messages.
-            Serial.println("[LoRa] Valid Packet Extracted -> UID: " + packet.uid + 
-                           " | Delta: " + String(packet.weightDelta) + "g");
-        } else {
-            // DOET: Error Signifier. Never blame the user, log the exact malformed string.
-            Serial.println("[LoRa] Error: Malformed private packet: " + raw);
+            // ROUTE 1: TELEMETRI SENSOR (Format: TLM|UID|DELTA)
+            if (prefix == "TLM") {
+                int secondPipe = raw.indexOf('|', firstPipe + 1);
+                if (secondPipe > 0) {
+                    packet.type = TELEMETRY;
+                    packet.uid = raw.substring(firstPipe + 1, secondPipe);
+                    packet.weightDelta = raw.substring(secondPipe + 1).toFloat();
+                    packet.valid = true;
+                    
+                    Serial.println("[LoRa] TLM Diterima -> UID: " + packet.uid + " | Delta: " + String(packet.weightDelta) + "g");
+                }
+            } 
+            // ROUTE 2: REGISTRASI CLOUD (Format: REG|UID|NIK)
+            else if (prefix == "REG") {
+                int secondPipe = raw.indexOf('|', firstPipe + 1);
+                if (secondPipe > 0) {
+                    packet.type = REGISTRATION;
+                    packet.uid = raw.substring(firstPipe + 1, secondPipe);
+                    packet.nik = raw.substring(secondPipe + 1); // Ambil sisa string sebagai NIK
+                    packet.valid = true;
+                    
+                    Serial.println("[LoRa] REG Diterima -> UID: " + packet.uid + " | NIK: " + packet.nik);
+                }
+            } else {
+                Serial.println("[LoRa] Error: Prefix tidak valid -> " + raw);
+            }
         }
     }
     return packet;

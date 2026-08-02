@@ -1,10 +1,18 @@
 #pragma once
 #include <Arduino.h>
 
-// SICP: Data Abstraction. We do not pass raw strings around; we pass validated structures.
+// SICP: Abstraksi Tipe Data
+enum PacketType {
+    UNKNOWN,
+    TELEMETRY,
+    REGISTRATION
+};
+
 struct LoRaPacket {
+    PacketType type;
     String uid;
-    float weightDelta;
+    float weightDelta; // Hanya dipakai jika type == TELEMETRY
+    String nik;        // Hanya dipakai jika type == REGISTRATION
     bool valid;
 };
 
