@@ -8,8 +8,8 @@ WorkingDirectory=/home/pi/1_pi_zero_node/web
 StandardOutput=inherit
 StandardError=inherit
 Restart=always
-User=root 
-# (Root required to bind to port 80 natively)
+# Security: Diturunkan dari 'root' menjadi 'pi' karena port pindah ke 8080
+User=pi 
 
 [Install]
 WantedBy=multi-user.target
