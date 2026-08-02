@@ -1,0 +1,23 @@
+# Node Dependencies
+node_modules/
+.next/
+out/
+build/
+
+# Python Virtual Environments & Cache
+venv/
+env/
+__pycache__/
+*.pyc
+
+# PlatformIO
+.pio/
+
+# OS Generated
+.DS_Store
+Thumbs.db
+
+# SECRETS (CRITICAL)
+.env
+.env.local
+*.env
