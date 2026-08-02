@@ -17,12 +17,13 @@ Sebuah sistem keamanan industri bernilai miliaran rupiah tidak ada artinya jika 
 
 ---
 
-## 🎨 Filosofi UI/UX (Krug's "Don't Make Me Think")
+## 🎨 Filosofi UI/UX (Krug's "Don't Make Me Think" & Norman's DOET)
 
-Antarmuka ini dirancang secara brutal untuk **Pemindaian Visual (Scannability)**, bukan untuk dibaca seperti buku.
-1. **Zero Cognitive Load:** Tidak ada ambiguitas. Kami mengganti angka mentah (misal: `-500g`) dengan status semantik yang eksplisit (**"Taken"** berwarna merah, atau **"Returned"** berwarna hijau).
-2. **High-Contrast Visual Hierarchy:** Menggunakan latar belakang *light-gray* dengan teks gelap untuk memastikan keterbacaan instan di bawah sinar matahari atau layar *mobile* satpam, meninggalkan estetika *dark-mode* yang justru memperlambat pemindaian (*scanning*).
-3. **DOET Feedback Loop:** Dilengkapi dengan indikator kesehatan *Websocket* (Live Connection) yang memberikan umpan balik psikologis bahwa sistem sedang mengawasi aset tanpa henti.
+Antarmuka ini dirancang secara brutal untuk **Pemindaian Visual (Scannability)**, ditargetkan langsung untuk level eksekutif (CEO/CTO).
+1. **Single Source of Truth (SSOT):** Dashboard secara otomatis melakukan *JOIN Query* ke tabel SDM (`hr_employees`) menggunakan NIK. Ini memastikan identitas peminjam selalu 100% akurat sesuai database kantor.
+2. **Zero Cognitive Load (Krug):** Tidak ada ambiguitas angka mentah. Fluktuasi `-500g` diterjemahkan secara semantik menjadi lencana **"Aset Keluar"** (Merah), dan `+500g` menjadi **"Aset Masuk"** (Hijau).
+3. **High-Contrast Corporate Aesthetic:** Menggunakan palet `slate` minimalis untuk memastikan tingkat keterbacaan instan tertinggi di layar *mobile* satpam maupun presentasi dewan direksi, menghindari desain *dark-mode* berlebihan yang memperlambat mata.
+4. **Immediate Feedback (DOET):** Dilengkapi dengan indikator kesehatan *Websocket* (Live Beacon) bergaya *pulsing radar* yang memberikan umpan balik psikologis bahwa sistem aktif melindungi aset.
 
 ---
 
@@ -36,67 +37,40 @@ Pastikan Node.js terinstal, lalu jalankan di terminal:
 cd 5_dashboard_nextjs
 npm install
 ```
-
 ### 2. Injeksi Kredensial (Design by Contract)
-
-Buat file `.env.local` di root folder `5_dashboard_nextjs/` dan masukkan kunci dari Supabase:
-
-```env
+Buat file .env.local di root folder 5_dashboard_nextjs/ dan masukkan kunci dari Supabase:
+```bash
 NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT_ID].supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJh..."
 ```
-
-*(Catatan: Tanpa kredensial ini, aplikasi akan menolak untuk me-render data).*
-
+(Catatan: Tanpa kredensial ini, aplikasi akan menolak untuk me-render data).
 ### 3. Eksekusi Dev Server
-
 ```bash
 npm run dev
 ```
-
-Buka `http://localhost:3000` di *browser*.
-
+Buka http://localhost:3000 di browser.
 ### 4. Uji Coba Real-Time (Simulasi)
-
-Buka [Supabase SQL Editor](https://www.google.com/search?q=https://supabase.com) di *tab* sebelahnya dan eksekusi perintah ini:
-
-```sql
-INSERT INTO transactions_log (rfid_uid, weight_delta) VALUES ('SIMULASI_LOKAL', -500);
+Buka Supabase SQL Editor di tab sebelahnya dan eksekusi perintah ini:
+```bash
+SQLINSERT INTO transactions_log (rfid_uid, weight_delta) VALUES ('SIMULASI_LOKAL', -500);
 ```
-
-Lihat ke layar `localhost:3000` Anda. Data peminjaman akan muncul dalam $\sim 200$ milidetik tanpa perlu *refresh* halaman.
-
----
+Lihat ke layar localhost:3000 Anda. Data peminjaman akan muncul dalam $\sim 200$ milidetik tanpa perlu refresh halaman.
 
 ## ☁️ Production Deployment (Vercel)
-
-Sistem ini didesain 100% *native* untuk Vercel (kreator Next.js) untuk menjamin *zero-downtime* dan *maintenance-free scaling*.
-
-### Fase 1: Sinkronisasi GitHub
-
+Sistem ini didesain 100% native untuk Vercel (kreator Next.js) untuk menjamin zero-downtime dan maintenance-free scaling.
+### Fase 1: Sinkronisasi GitHubBashgit init
 ```bash
-git init
 git add .
 git commit -m "Initial commit: LoRaVault Command Center"
 git branch -M main
 git remote add origin [https://github.com/](https://github.com/)[username_kamu]/loravault-dashboard.git
 git push -u origin main
 ```
-
 ### Fase 2: Vercel Integration
-
-1. Login ke [Vercel](https://www.google.com/search?q=https://vercel.com) dengan akun GitHub Anda.
-2. Klik **Add New...** $\rightarrow$ **Project**.
-3. Import repositori `loravault-dashboard`.
-4. ⚠️ **KRUSIAL:** Buka bagian **Environment Variables** di layar konfigurasi Vercel, lalu tambahkan:
-* `NEXT_PUBLIC_SUPABASE_URL` = `https://[proyek_kamu].supabase.co`
-* `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `eyJh...`
-
-
-5. Klik **Deploy**.
-
-Dalam 2 menit, Command Center LoRaVault Anda akan *Live* secara global dan siap dipresentasikan di hadapan dewan direksi atau juri kompetisi.
-
----
-
-*Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).*
+1. Login ke Vercel dengan akun GitHub Anda.
+2. Klik Add New... $\rightarrow$ Project.
+3. Import repositori loravault-dashboard.
+4. ⚠️ KRUSIAL: Buka bagian Environment Variables di layar konfigurasi Vercel, lalu tambahkan:
+  - NEXT_PUBLIC_SUPABASE_URL = https://[proyek_kamu].supabase.co
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJh...
+5. Klik Deploy.
