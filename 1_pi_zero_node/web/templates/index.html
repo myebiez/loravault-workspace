@@ -3,46 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LoRaVault Setup</title>
-    <!-- Krug's Law: Design for Scanning. No CSS files, brutalist inline UI. -->
+    <title>LoRaVault Command Center (Offline)</title>
+    <!-- Krug's Law: High contrast, obvious visual hierarchy, zero noise. -->
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f4f5; color: #18181b; text-align: center; }
-        h1 { font-size: 24px; }
-        p { font-size: 16px; color: #52525b; }
-        /* Krug's Law: Make clickable things obviously clickable */
-        .btn-massive {
-            display: block; width: 100%; max-width: 400px; margin: 20px auto; padding: 25px;
-            font-size: 24px; font-weight: bold; color: white; background-color: #2563eb;
-            border: none; border-radius: 12px; cursor: pointer;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-        }
-        .btn-massive:active { background-color: #1d4ed8; transform: translateY(2px); }
-        #status { margin-top: 20px; font-weight: bold; color: #16a34a; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 20px; background: #f4f4f5; color: #18181b; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; border-bottom: 2px solid #e4e4e7; padding-bottom: 10px; margin-bottom: 30px;}
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 25px; }
+        .card h2 { margin-top: 0; color: #2563eb; font-size: 20px;}
+        
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #3f3f46; }
+        input[type="text"] { width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #d4d4d8; border-radius: 6px; font-size: 16px; box-sizing: border-box;}
+        input[type="text"][readonly] { background-color: #f4f4f5; font-weight: bold; color: #2563eb; }
+        
+        button { display: block; width: 100%; padding: 16px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        button.btn-primary { background-color: #2563eb; }
+        button.btn-primary:active { background-color: #1d4ed8; transform: translateY(2px); }
+        button.btn-danger { background-color: #dc2626; margin-top: 10px;}
+        button.btn-danger:active { background-color: #b91c1c; transform: translateY(2px); }
+        
+        .status-msg { margin-top: 15px; font-weight: bold; text-align: center; padding: 10px; border-radius: 6px; display: none;}
+        .status-success { background: #dcfce7; color: #16a34a; display: block;}
+        .status-error { background: #fee2e2; color: #dc2626; display: block;}
+        .instruction { font-size: 14px; color: #71717a; text-align: center; margin-bottom: 15px;}
     </style>
 </head>
 <body>
-    <!-- Trunk Test: User instantly knows where they are and what to do -->
-    <h1>LoRaVault Field Config</h1>
-    <p>Connected via local Hotspot (192.168.4.1)</p>
-    
-    <button class="btn-massive" onclick="tareScale()">Zero the Scale (Tare)</button>
-    <p id="status"></p>
+    <div class="container">
+        <h1>LoRaVault Offline Portal</h1>
+        
+        <!-- SECTION 1: User Registration -->
+        <div class="card">
+            <h2>1. Mendaftarkan Kartu Akses</h2>
+            <p class="instruction">Tempelkan kartu RFID pada mesin. Masukkan NIK institusi.</p>
+            
+            <label for="uid">UID Kartu RFID (Otomatis):</label>
+            <input type="text" id="uid" readonly placeholder="Menunggu tap kartu...">
+            
+            <label for="nik">NIM / NIK / ID Pegawai:</label>
+            <input type="text" id="nik" placeholder="Misal: EMP-2026-001">
+            
+            <button class="btn-primary" onclick="registerUser()">Kaitkan Kartu & ID</button>
+            <div id="reg-status" class="status-msg"></div>
+        </div>
+
+        <!-- SECTION 2: Hardware Config -->
+        <div class="card">
+            <h2>2. Kalibrasi Hardware</h2>
+            <button class="btn-danger" onclick="tareScale()">Nol-kan Timbangan (Tare)</button>
+            <div id="hw-status" class="status-msg"></div>
+        </div>
+    </div>
 
     <script>
-        // Pragmatic: Fast, obvious fetch call with immediate feedback
+        // Krug's Law: Mindless Interaction. Auto-poll hardware state so user doesn't have to refresh.
+        setInterval(() => {
+            fetch('/api/last_tap')
+                .then(res => res.json())
+                .then(data => {
+                    const uidInput = document.getElementById('uid');
+                    if(data.uid && uidInput.value !== data.uid) {
+                        uidInput.value = data.uid;
+                    }
+                });
+        }, 1500);
+
+        function showStatus(elementId, isSuccess, message) {
+            const el = document.getElementById(elementId);
+            el.className = isSuccess ? "status-msg status-success" : "status-msg status-error";
+            el.innerText = message;
+        }
+
+        function registerUser() {
+            const uid = document.getElementById('uid').value;
+            const nik = document.getElementById('nik').value;
+
+            if(!uid || !nik) {
+                showStatus('reg-status', false, "⚠️ Gagal: UID dan NIK wajib diisi.");
+                return;
+            }
+
+            const btn = document.querySelector('.btn-primary');
+            btn.innerText = "Menyimpan...";
+
+            fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, nik })
+            })
+            .then(res => res.json())
+            .then(data => {
+                showStatus('reg-status', data.status === 'success', data.message);
+                btn.innerText = "Kaitkan Kartu & ID";
+                if(data.status === 'success') {
+                    document.getElementById('uid').value = "";
+                    document.getElementById('nik').value = "";
+                }
+            }).catch(err => {
+                showStatus('reg-status', false, "❌ Gagal menghubungi sistem internal.");
+                btn.innerText = "Kaitkan Kartu & ID";
+            });
+        }
+
         function tareScale() {
-            const btn = document.querySelector('.btn-massive');
-            btn.innerText = "Processing...";
+            const btn = document.querySelector('.btn-danger');
+            btn.innerText = "Mengkalibrasi...";
             
             fetch('/api/tare', { method: 'POST' })
             .then(res => res.json())
             .then(data => {
-                document.getElementById('status').innerText = "✅ Scale is now zeroed.";
-                btn.innerText = "Zero the Scale (Tare)";
+                showStatus('hw-status', true, "✅ Timbangan berhasil di-nol-kan.");
+                btn.innerText = "Nol-kan Timbangan (Tare)";
             }).catch(err => {
-                document.getElementById('status').innerText = "❌ Error connecting to hardware.";
-                btn.innerText = "Zero the Scale (Tare)";
-                document.getElementById('status').style.color = "#dc2626";
+                showStatus('hw-status', false, "❌ Error menghubungi perangkat keras.");
+                btn.innerText = "Nol-kan Timbangan (Tare)";
             });
         }
     </script>
