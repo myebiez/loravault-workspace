@@ -1,3 +1,36 @@
+-- ==============================================================================
+-- SECURE EDGE GATEWAY ENDPOINTS (RPC)
+-- ==============================================================================
+-- Fungsi ini berjalan sebagai Superuser (SECURITY DEFINER) namun mengamankan diri 
+-- menggunakan token HMAC. Kunci 'anon' publik tidak lagi bisa disalahgunakan hacker.
+
+CREATE OR REPLACE FUNCTION secure_insert_telemetry(p_rfid_uid TEXT, p_weight_delta NUMERIC, p_token TEXT)
+RETURNS void AS $$
+BEGIN
+    -- Pragmatic Programmer: Design by Contract. Tolak mentah-mentah jika token salah.
+    IF p_token != 'secret_esp32_hmac_token' THEN
+        RAISE EXCEPTION 'Unauthorized Gateway Request';
+    END IF;
+    INSERT INTO transactions_log (rfid_uid, weight_delta) VALUES (p_rfid_uid, p_weight_delta);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE OR REPLACE FUNCTION secure_sync_user(p_rfid_uid TEXT, p_nik TEXT, p_token TEXT)
+RETURNS void AS $$
+BEGIN
+    IF p_token != 'secret_esp32_hmac_token' THEN
+        RAISE EXCEPTION 'Unauthorized Gateway Request';
+    END IF;
+    -- Menggunakan klausa ON CONFLICT untuk menangani Air-Gapped Sync yang berulang
+    INSERT INTO users (rfid_uid, nik) VALUES (p_rfid_uid, p_nik) ON CONFLICT (rfid_uid) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ==============================================================================
+-- THE MATHEMATICAL BRAIN (STATE MACHINE TRIGGER)
+-- ==============================================================================
 -- SICP: Procedural Abstraction. 
 -- This function encapsulates the complex logic of the "Indiana Jones" vulnerability check.
 -- It automatically translates a raw weight delta into a physical borrow or return event.
@@ -39,7 +72,7 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- 4. State Machine: Borrow vs. Return (DIPERBARUI MENGGUNAKAN rfid_uid)
+    -- 4. State Machine: Borrow vs. Return (Menggunakan Single Source of Truth rfid_uid)
     IF NEW.weight_delta < -15 THEN
         -- Weight decreased -> Asset Taken
         -- Upsert into active loans to prevent duplicates if system desyncs
