@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/PLATFORM-SUPABASE-green?style=for-the-badge" alt="Supabase">
   
   <h1>🧠 Node 4: The Mathematical Brain (Supabase)</h1>
-  <p><b>State Machine, B-Tree Indexes, & Zero-Trust RLS Policies</b></p>
+  <p><b>State Machine, B-Tree Indexes, & Single Source of Truth DB</b></p>
 </div>
 
 ---
@@ -13,53 +13,36 @@
 
 Jika Node *Hardware* (Pi Zero & ESP32) adalah otot dan saraf, maka **Node 4 adalah Otaknya**. 
 
-Di sistem manajemen inventaris konvensional, manusia harus menginput data: *"Budi meminjam Bor."* Di **LoRaVault**, manusia tidak menyentuh *software* sama sekali. Sistem ini menerjemahkan hukum fisika (perubahan berat dalam gram) menjadi sebuah entitas bisnis (Peminjaman atau Pengembalian) secara otomatis. 
+Di sistem konvensional, data HRD sering tumpang tindih (*Silo Data*). Arsitektur LoRaVault terbaru menerapkan **Single Source of Truth (SSOT)**. Sistem Keamanan (Tabel `users`) tidak lagi menyimpan Nama dan Departemen secara berulang, melainkan hanya berpegang pada NIK (Nomor Induk Karyawan). Ini menghemat *bandwidth* transmisi LoRa hingga 60% dan mencegah data menjadi basi jika ada mutasi karyawan.
 
-Hal ini membunuh *"Human Error"* hingga 0% dan mengotomatisasi pencatatan inventaris (Admin Gudang Robotik), menghemat ratusan juta rupiah dari potensi kehilangan aset dan inefisiensi jam kerja operasional.
+Selain itu, seluruh logika bisnis (menerjemahkan fluktuasi Gram menjadi Peminjaman/Pengembalian) diproses 100% di level *Database* melalui *PostgreSQL Triggers*, membunuh *"Human Error"* hingga 0%.
 
 ---
 
 ## 🏛️ Filosofi Arsitektur (Engineering Rigor)
 
-- **SICP (Data & Procedural Abstraction):** Node Edge (ESP32/Pi Zero) dibuat **sangat bodoh**. Mereka tidak tahu apa itu "Peminjaman" atau "Pengembalian". Mereka hanya tahu: *"Ada UID X, dan berat berubah Y gram"*. Seluruh logika bisnis (*State Machine*) dienkapsulasi murni di dalam level *Database* melalui *PostgreSQL Triggers*. 
-- **CLRS (Efisiensi Asimtotik):** Seiring berjalannya waktu, tabel transaksi akan membengkak hingga jutaan baris. Pencarian UID pengguna dan validasi berat aset dijamin berjalan dalam **$\mathcal{O}(\log N)$ time complexity** melalui implementasi **B-Tree Indexing** yang ketat. Sistem tidak akan pernah *ngelag*.
-- **The Pragmatic Programmer (Design by Contract & Fail-Fast):** Data tidak valid dilarang keras masuk. Jika ada fluktuasi berat di bawah *margin of error* (15 gram), sistem akan mengabaikannya (Filter Noise).
-- **Security by Default (Row Level Security):** ESP32 secara kriptografis hanya diizinkan melakukan perintah `INSERT` ke tabel transaksi. Jika kredensial ESP32 dibajak oleh *hacker*, mereka **TIDAK BISA** membaca data (*SELECT*), menghapus log (*DELETE*), atau memanipulasi peminjaman.
+- **Database Normalization (SSOT):** Tabel `users` hanya berisi `rfid_uid` dan `nik`. Jika nama Budi diganti di tabel HRD (`hr_employees`), Dasbor LoRaVault secara otomatis menampilkan nama yang baru berkat relasi *Foreign Key*.
+- **SICP (Data & Procedural Abstraction):** Node Edge dibuat sangat bodoh. Mereka hanya mengirim *"UID X, berat berubah Y gram"*. Seluruh logika bisnis (*State Machine*) dienkapsulasi di *PostgreSQL Triggers*. 
+- **CLRS (Efisiensi Asimtotik):** Seiring berjalannya waktu, tabel transaksi akan membengkak hingga jutaan baris. Pencarian data beroperasi dalam **$\mathcal{O}(\log N)$ time complexity** melalui *B-Tree Indexing* yang ketat.
+- **Security by Default (Row Level Security):** ESP32 secara kriptografis hanya diizinkan untuk `INSERT` data telemetri dan pendaftaran, tanpa bisa membaca atau menghapus riwayat apa pun.
 
 ---
 
 ## 🗄️ Skema Topologi (Data Structures)
 
-Sistem ini terdiri dari 4 tabel utama dengan relasi *Foreign Key* yang ketat:
-
-1. **`users`**: Memetakan UID kartu RFID fisik ke identitas manusia (Nama, Departemen).
-2. **`assets`**: Katalog inventaris brankas. Menyimpan nama alat, berat absolut (*baseline weight*), dan toleransi penyusutan (*tolerance*).
-3. **`transactions_log`**: Buku besar yang tidak bisa diubah (*Immutable Ledger*). Menyimpan aliran data mentah dari ESP32.
-4. **`active_loans`**: Tabel *Real-Time State*. Otomatis terisi saat ada barang keluar, dan otomatis terhapus saat barang masuk. Inilah yang ditampilkan di layar manajer.
-
----
-
-## ⚙️ The Trigger: Menangkal "Indiana Jones Vulnerability"
-
-Fungsi `process_vault_transaction()` adalah mahakarya algoritma sistem ini. Setiap kali ESP32 mengirim data baru:
-1. **Identifikasi:** Sistem mencari siapa pemilik RFID secara $\mathcal{O}(\log N)$.
-2. **Filter Fisika:** Jika fluktuasi berat $< 15g$, abaikan (dianggap guncangan pintu).
-3. **Pencocokan Aset:** Sistem membandingkan delta berat dengan katalog aset. Jika seseorang mengambil barang 1.500g, lalu mengembalikan **batu** seberat 1.200g, sistem **TIDAK AKAN** mencoret peminjamannya karena berada di luar batas toleransi (*Indiana Jones rock-swap failed*).
-4. **Mutasi State:** Mengotomatisasi perpindahan barang ke dalam atau keluar dari `active_loans`.
+1. **`hr_employees`**: Kebenaran tunggal untuk data manusia (Nama, Departemen).
+2. **`users`**: Jembatan LoRaVault. Memetakan UID kartu RFID fisik ke NIK.
+3. **`assets`**: Katalog inventaris brankas (Berat absolut dan toleransi penyusutan).
+4. **`transactions_log`**: Buku besar yang tidak bisa diubah (*Immutable Ledger*).
+5. **`active_loans`**: Tabel *Real-Time State* barang di tangan karyawan.
 
 ---
 
 ## 🚀 Setup & Deployment
 
-Sistem ini didesain agar sangat mudah diimplementasikan (Krug's Law: *Don't Make Me Think*).
-
-1. Buat proyek baru di [Supabase](https://supabase.com).
-2. Masuk ke menu **SQL Editor**.
-3. *Copy* dan *Paste* ketiga file secara berurutan, lalu klik **Run**:
-   - `01_schema.sql` (Membangun fondasi tabel dan indeks).
-   - `02_functions_triggers.sql` (Menanamkan otak matematika dan *State Machine*).
-   - `03_rls_policies.sql` (Mengunci gerbang keamanan *Zero-Trust*).
-4. (Opsional) Masukkan data awal (*seed data*) untuk tabel `users` (daftarkan kartu RFID Anda) dan `assets` (daftarkan barang uji coba Anda beserta berat aslinya).
-
----
-*Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).*
+1. Buka [Supabase](https://supabase.com) dan masuk ke menu **SQL Editor**.
+2. *Copy* dan *Paste* ketiga file secara berurutan, lalu klik **Run**:
+   - `01_schema.sql` (Fondasi tabel, SSOT, dan indeks B-Tree).
+   - `02_functions_triggers.sql` (Menanamkan otak matematika dan pencegahan Indiana Jones Vulnerability).
+   - `03_rls_policies.sql` (Mengunci gerbang akses *Zero-Trust*).
+3. Tabel `hr_employees` secara otomatis akan diisi dengan data *Mock* (Fadhil dan Yudha) agar dasbor siap diuji coba.
