@@ -29,12 +29,25 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- ==============================================================================
+-- SECURE STORAGE ENDPOINT (NODE 3 CAMERA)
+-- ==============================================================================
+-- Memungkinkan Node 3 untuk melampirkan URL bukti forensik ke baris transaksi 
+-- tanpa harus memberikan akses UPDATE publik ke seluruh tabel.
+CREATE OR REPLACE FUNCTION secure_attach_evidence(p_transaction_id UUID, p_url TEXT, p_token TEXT)
+RETURNS void AS $$
+BEGIN
+    -- Menggunakan token gateway yang sama untuk memvalidasi identitas internal sistem
+    IF p_token != 'secret_esp32_hmac_token' THEN
+        RAISE EXCEPTION 'Unauthorized Storage Request';
+    END IF;
+    UPDATE transactions_log SET evidence_url = p_url WHERE id = p_transaction_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ==============================================================================
 -- THE MATHEMATICAL BRAIN (STATE MACHINE TRIGGER)
 -- ==============================================================================
--- SICP: Procedural Abstraction. 
--- This function encapsulates the complex logic of the "Indiana Jones" vulnerability check.
--- It automatically translates a raw weight delta into a physical borrow or return event.
-
 CREATE OR REPLACE FUNCTION process_vault_transaction()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -42,24 +55,18 @@ DECLARE
     matched_asset assets%ROWTYPE;
     abs_delta NUMERIC;
 BEGIN
-    -- 1. Identify User (\mathcal{O}(\log N) lookup) menggunakan rfid_uid
     SELECT * INTO matched_user FROM users WHERE rfid_uid = NEW.rfid_uid;
     
     IF NOT FOUND THEN
-        -- Pragmatic: Silent failure is unacceptable. We let the transaction log, 
-        -- but we do not process loans for unknown RFIDs. The Pi 3 GUI will flag this.
         RETURN NEW;
     END IF;
 
     abs_delta := ABS(NEW.weight_delta);
 
-    -- 2. Filter noise (DOET: Ignorable variations)
     IF abs_delta < 15 THEN
-        RETURN NEW; -- Door was opened and closed, but nothing was taken.
+        RETURN NEW; 
     END IF;
 
-    -- 3. Find the matching asset by weight (\mathcal{O}(\log N) via index scan)
-    -- We look for an asset whose baseline weight matches the delta within its specific tolerance.
     SELECT * INTO matched_asset 
     FROM assets 
     WHERE baseline_weight_g >= (abs_delta - tolerance_g) 
@@ -67,21 +74,15 @@ BEGIN
     LIMIT 1;
 
     IF NOT FOUND THEN
-        -- Anomaly: Weight change doesn't match any known asset.
-        -- (e.g., The Indiana Jones rock-swap trick failed).
         RETURN NEW;
     END IF;
 
-    -- 4. State Machine: Borrow vs. Return (Menggunakan Single Source of Truth rfid_uid)
-    IF NEW.weight_delta < -15 THEN
-        -- Weight decreased -> Asset Taken
-        -- Upsert into active loans to prevent duplicates if system desyncs
+    IF NEW.weight_delta <= -15 THEN
         INSERT INTO active_loans (rfid_uid, asset_id) 
         VALUES (matched_user.rfid_uid, matched_asset.id)
         ON CONFLICT (asset_id) DO UPDATE SET rfid_uid = EXCLUDED.rfid_uid, borrowed_at = NOW();
 
-    ELSIF NEW.weight_delta > 15 THEN
-        -- Weight increased -> Asset Returned
+    ELSIF NEW.weight_delta >= 15 THEN
         DELETE FROM active_loans 
         WHERE asset_id = matched_asset.id 
           AND rfid_uid = matched_user.rfid_uid;
@@ -91,8 +92,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Bind the procedural abstraction to the data layer
 CREATE TRIGGER trigger_process_vault_transaction
 AFTER INSERT ON transactions_log
 FOR EACH ROW
 EXECUTE FUNCTION process_vault_transaction();
+
+
+-- ==============================================================================
+-- SUPABASE 2026 EXPLICIT EXECUTE GRANTS
+-- ==============================================================================
+-- Mengatasi pengetatan permission dari versi PostgreSQL/Supabase terbaru
+GRANT EXECUTE ON FUNCTION secure_insert_telemetry TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION secure_sync_user TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION secure_attach_evidence TO anon, authenticated;
