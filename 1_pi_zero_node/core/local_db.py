@@ -11,6 +11,8 @@ class LocalAuthDB:
 
     def _init_db(self):
         with sqlite3.connect(DB_PATH) as conn:
+            # The Pragmatic Programmer: Mengatasi "database is locked" saat Flask dan Core Loop mengakses bersamaan
+            conn.execute('PRAGMA journal_mode=WAL;')
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     uid TEXT PRIMARY KEY,
