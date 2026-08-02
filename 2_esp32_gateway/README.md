@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/LANG-C++-blue?style=for-the-badge" alt="C++">
   
   <h1>🌉 Node 2: The Bridge (ESP32 Gateway)</h1>
-  <p><b>Stateless LoRa-to-HTTP Telemetry Courier</b></p>
+  <p><b>Secure RPC API Gateway & Stateless LoRa Courier</b></p>
 </div>
 
 ---
@@ -13,7 +13,7 @@
 
 Jika **Node 1 (Pi Zero)** adalah otak yang terkunci di dalam brankas baja (Sangkar Faraday), maka **Node 2 (ESP32 Gateway)** adalah telinga yang berada di dunia luar (Pos Satpam/Ruang Server). 
 
-Tugas Node 2 sangat spesifik dan murni: **Mendengarkan frekuensi radio LoRa dari brankas, dan menembakkannya langsung ke Cloud (Supabase) menggunakan jaringan Wi-Fi gedung.** 
+Tugas Node 2 sangat spesifik dan murni: **Mendengarkan frekuensi radio LoRa dari brankas, menyuntikkan Token Keamanan (HMAC), dan menembakkannya ke *Secure RPC Endpoint* di Cloud (Supabase) menggunakan jaringan Wi-Fi gedung.** 
 
 Dengan memisahkan fungsi ini (*Orthogonality*), matinya router Wi-Fi gudang atau sabotase kabel di area brankas **TIDAK AKAN** melumpuhkan kemampuan brankas untuk berteriak meminta tolong via gelombang radio. Ini adalah jaminan *Uptime 99.9%* untuk keamanan aset Anda.
 
@@ -21,10 +21,11 @@ Dengan memisahkan fungsi ini (*Orthogonality*), matinya router Wi-Fi gudang atau
 
 ## 🏛️ Filosofi Arsitektur (Engineering Rigor)
 
-- **The Pragmatic Programmer (Decoupling & Security):** Kredensial Wi-Fi dan API Key Supabase **TIDAK PERNAH** di- *hardcode* di dalam source code `.cpp`. Semua rahasia disuntikkan secara dinamis saat proses kompilasi (*compile-time*) melalui `platformio.ini` (`build_flags`). 
-- **SICP (Procedural Abstraction):** File `main.cpp` tidak memiliki logika bisnis. Ia hanya bertindak sebagai konduktor yang memanggil modul `wifi_manager`, `lora_receiver`, dan `supabase_client` secara berurutan.
-- **CLRS (Asymptotic Efficiency):** Parsing string UART dilakukan dalam kompleksitas waktu $\mathcal{O}(N)$ (linear terhadap panjang *buffer*), memastikan tidak ada hambatan prosesor saat paket data masuk. Manajemen memori menggunakan alokasi statis (`StaticJsonDocument<200>`) untuk mencegah *Heap Fragmentation* yang sering membunuh ESP32.
-- **DOET (Constraints & Mapping):** Modul LoRa pada node ini dikunci secara fisik pada state $\mathcal{O}(1)$ (Mode Transmisi konstan) dengan menyolder pin M0 dan M1 langsung ke Ground (GND). Menghilangkan kerumitan penggantian *state* pada perangkat lunak.
+- **RPC Security Definer (Zero-Trust):** ESP32 tidak lagi melakukan *Direct Table Insert*. Node ini membungkus *payload* dengan `GATEWAY_TOKEN` rahasia dan mengirimkannya ke fungsi RPC di Supabase. Ini membuat kunci publik `anon` tidak berguna bagi peretas yang mencoba memanipulasi data dari luar.
+- **DOET (Immediate Feedback Loop):** Menerapkan mekanisme **ACK (Acknowledgement)**. Begitu Supabase merespons dengan HTTP 200/201, ESP32 seketika menembakkan konfirmasi `ACK|UID` via radio kembali ke brankas, memastikan tidak ada paket data HRD yang hilang di udara (*Guaranteed Delivery*).
+- **The Pragmatic Programmer (Decoupling):** Kredensial Wi-Fi, API Key Supabase, dan Gateway Token **TIDAK PERNAH** di- *hardcode* di dalam source code `.cpp`. Semua rahasia disuntikkan secara dinamis saat proses kompilasi (*compile-time*) melalui `platformio.ini`. 
+- **CLRS (Asymptotic Efficiency):** Parsing string UART dilakukan dalam kompleksitas waktu $\mathcal{O}(N)$ (linear terhadap panjang *buffer*). Manajemen memori menggunakan alokasi statis (`StaticJsonDocument<256>`) untuk mencegah *Heap Fragmentation* yang sering membunuh ESP32.
+- **Hardware Constraints:** Modul LoRa pada node ini dikunci secara fisik pada state $\mathcal{O}(1)$ (Mode Transmisi konstan) dengan menyolder pin M0 dan M1 langsung ke Ground (GND). Menghilangkan kerumitan penggantian *state* pada perangkat lunak.
 
 ---
 
@@ -42,7 +43,7 @@ Menggunakan Hardware Serial 2 pada ESP32 untuk menghindari konflik dengan Serial
 *   **RX LoRa** $\rightarrow$ Dihubungkan ke pin **TX2 (GPIO 17)** ESP32.
 
 ### 3. Penguncian Mode (Hardware Constraint)
-Gateway hanya bertugas mendengar. Tidak ada mode *sleep* atau *config*.
+Gateway hanya bertugas mendengar dan merespons. Tidak ada mode *sleep* atau *config*.
 *   **M0 LoRa** $\rightarrow$ Solder permanen ke **GND**.
 *   **M1 LoRa** $\rightarrow$ Solder permanen ke **GND**.
 
@@ -61,6 +62,7 @@ build_flags =
     -D WIFI_PASS=\"SuperSecretPassword\"
     -D SUPABASE_URL=\"https://[PROJECT_ID].supabase.co\"
     -D SUPABASE_KEY=\"eyJh...[ANON_KEY]...\"
+    -D GATEWAY_TOKEN=\"secret_esp32_hmac_token\"
 ```
 
 ### Langkah 2: Build & Flash
@@ -70,25 +72,27 @@ build_flags =
 3. Hubungkan ESP32 ke PC via USB.
 4. Klik ikon **Tanda Panah Kanan (→)** untuk melakukan proses *Upload / Flash*. (Tahan tombol `BOOT` pada ESP32 jika muncul pesan *Connecting...*).
 
-
 ### Langkah 3: Verifikasi Log (Serial Monitor)
 
-Klik ikon **Steker (🔌)** di bilah bawah untuk membuka Serial Monitor (Baudrate 115200). 
+Klik ikon **Steker (🔌)** di bilah bawah untuk membuka Serial Monitor (Baudrate 115200).
 
 Ketika ada pendaftaran pegawai baru (Air-Gapped Sync), log akan menampilkan:
+
 ```text
 [LoRa] REG Diterima -> UID: 9876543210 | NIK: EMP-2026-001
-[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/users](https://xxx.supabase.co/rest/v1/users)
-[Supabase] Success! Payload accepted. HTTP 201
+[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/rpc/secure_sync_user](https://xxx.supabase.co/rest/v1/rpc/secure_sync_user)
+[Supabase] Success! Payload accepted. HTTP 200
+[LoRa] ACK Transmitted back to Vault.
 ```
 
 Ketika ada aksi peminjaman/pengembalian aset fisik, log akan menampilkan:
 
 ```text
 [LoRa] TLM Diterima -> UID: 9876543210 | Delta: -1532.00g
-[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/transactions_log](https://xxx.supabase.co/rest/v1/transactions_log)
+[Supabase] Executing POST to: [https://xxx.supabase.co/rest/v1/rpc/secure_insert_telemetry](https://xxx.supabase.co/rest/v1/rpc/secure_insert_telemetry)
 [Supabase] Success! Payload accepted. HTTP 201
 ```
+
 ---
 
 *Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).*
