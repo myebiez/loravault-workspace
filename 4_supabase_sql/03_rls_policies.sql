@@ -22,15 +22,19 @@ ALTER TABLE active_loans ENABLE ROW LEVEL SECURITY;
 -- ==============================================================================
 -- 2. COMMAND CENTER POLICIES (NEXT.JS DASHBOARD)
 -- ==============================================================================
--- Mengizinkan Dasbor Eksekutif (client-side) untuk MEMBACA (SELECT) data secara real-time.
--- Karena ini dasbor monitoring, akses READ diberikan untuk memastikan Websocket berjalan.
--- Operasi tulis (Admin Panel) di masa depan WAJIB menggunakan Service Role Key (Server-Side).
+-- Hapus akses terbuka (anon) jika sebelumnya pernah dijalankan
+DROP POLICY IF EXISTS "Command Center read hr" ON hr_employees;
+DROP POLICY IF EXISTS "Command Center read users" ON users;
+DROP POLICY IF EXISTS "Command Center read assets" ON assets;
+DROP POLICY IF EXISTS "Command Center read logs" ON transactions_log;
+DROP POLICY IF EXISTS "Command Center read loans" ON active_loans;
 
-CREATE POLICY "Command Center read hr" ON hr_employees FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "Command Center read users" ON users FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "Command Center read assets" ON assets FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "Command Center read logs" ON transactions_log FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "Command Center read loans" ON active_loans FOR SELECT TO anon, authenticated USING (true);
+-- Terapkan Zero-Trust Absolute: Hanya yang LOGIN (authenticated) yang boleh membaca data
+CREATE POLICY "Command Center read hr" ON hr_employees FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Command Center read users" ON users FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Command Center read assets" ON assets FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Command Center read logs" ON transactions_log FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Command Center read loans" ON active_loans FOR SELECT TO authenticated USING (true);
 
 -- ==============================================================================
 -- 3. VISUAL AUDIT STORAGE POLICIES (PI 3 CAMERA)
