@@ -6,15 +6,11 @@ export default function TransactionLog() {
   const [logs, setLogs] = useState<any[]>([]);
 
   const fetchLogs = async () => {
-    // Menambahkan `evidence_url` ke dalam query pemanggilan data
     const { data, error } = await supabase
       .from('transactions_log')
       .select(`
         id, created_at, rfid_uid, weight_delta, evidence_url,
-        users (
-          nik,
-          hr_employees ( full_name )
-        )
+        users ( nik, hr_employees ( full_name ) )
       `)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -24,18 +20,26 @@ export default function TransactionLog() {
   useEffect(() => {
     fetchLogs();
     const channel = supabase.channel('realtime_logs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions_log' }, () => {
-        // Fetch ulang agar kita mendapatkan URL foto yang baru saja di-UPDATE oleh Pi 3
-        fetchLogs(); 
-      })
-      // Dengarkan juga event UPDATE jika Pi 3 sedikit terlambat mengunggah foto setelah baris di-INSERT
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions_log' }, () => {
-        fetchLogs(); 
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions_log' }, () => fetchLogs())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions_log' }, () => fetchLogs())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  // FUNGSI KEAMANAN: Meminta URL sementara yang otomatis hangus dalam 60 detik
+  const handleViewPhoto = async (fileName: string) => {
+    const { data, error } = await supabase.storage
+      .from('audit_snapshots')
+      .createSignedUrl(fileName, 60); // Waktu hidup 60 detik
+      
+    if (data) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      alert("Akses ditolak atau foto tidak ditemukan.");
+      console.error(error);
+    }
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden text-sm flex flex-col h-full">
@@ -46,8 +50,9 @@ export default function TransactionLog() {
       
       <ul className="divide-y divide-slate-100 flex-grow">
         {logs.map((log) => {
-          const isTaken = log.weight_delta < -15;
-          const isReturned = log.weight_delta > 15;
+          // KONSISTENSI LOGIKA: Disamakan dengan SQL Trigger (<= dan >=)
+          const isTaken = log.weight_delta <= -15;
+          const isReturned = log.weight_delta >= 15;
           
           let actionText = 'Guncangan / Akses Ditolak';
           let badgeColor = 'bg-slate-100 text-slate-600 ring-slate-200';
@@ -71,9 +76,7 @@ export default function TransactionLog() {
                   {displayName}
                 </span>
                 <div className="flex items-center space-x-2 mt-1">
-                  <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                    UID: {log.rfid_uid}
-                  </span>
+                  <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">UID: {log.rfid_uid}</span>
                   <span className="text-xs font-medium text-slate-500 tabular-nums">
                     {new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
@@ -81,21 +84,19 @@ export default function TransactionLog() {
               </div>
               
               <div className="flex items-center justify-end space-x-3">
-                {/* VISUAL EVIDENCE BUTTON - DOET: Scannable and clickable affordance */}
+                {/* TOMBOL BUTTON (Bukan Tag Anchor lagi) */}
                 {log.evidence_url && (
-                  <a 
-                    href={log.evidence_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <button 
+                    onClick={() => handleViewPhoto(log.evidence_url)}
                     className="flex items-center space-x-1 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 transition-colors"
-                    title="Lihat Bukti Foto"
+                    title="Lihat Bukti Foto (Secure)"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     <span>Foto</span>
-                  </a>
+                  </button>
                 )}
                 
                 <span className="text-slate-500 font-mono text-xs tabular-nums w-16 text-right">

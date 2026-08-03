@@ -9,6 +9,7 @@ class Config:
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+    GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN") # Injeksi Token Kriptografis
     
     # UI/UX: Executive Premium Theme (Palantir/Bloomberg terminal aesthetic)
     # Krug's Rule 8 (Visual Hierarchy) & Norman's Signifiers: High contrast, semantic colors.

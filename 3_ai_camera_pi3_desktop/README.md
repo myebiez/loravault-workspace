@@ -19,9 +19,10 @@ CCTV konvensional merekam video 24/7, memaksa manajemen untuk membuang waktu ber
 
 ## 🏛️ Filosofi Arsitektur (Engineering Rigor)
 
+- **Single Source of Truth (SSOT):** Node ini cerdas. Ia tidak hanya mengambil data sensor mentah, melainkan melakukan `JOIN Query` ke tabel HRD Perusahaan (`hr_employees`). Sehingga, foto pencuri di Telegram akan dikirimkan beserta **Nama Lengkap & Departemen** asli, bukan hanya angka NIK/UID yang membingungkan.
 - **CLRS (Efisiensi Asimtotik):** Pencarian bukti kejahatan diubah dari $\mathcal{O}(N)$ (mencari dalam durasi video yang panjang) menjadi $\mathcal{O}(1)$ (satu foto presisi yang terikat langsung dengan satu ID Transaksi dan Waktu).
 - **The Pragmatic Programmer (Orthogonality & Concurrency):** Proses mendengarkan Cloud (I/O Bound) dan proses me-render GUI (Main Thread) dipisahkan secara absolut. Mereka hanya berkomunikasi melalui *Thread-Safe Queue* (`queue.Queue()`). Jika koneksi internet putus, GUI tidak akan *freeze* atau *crash*.
-- **Steve Krug's 1st Law (Don't Make Me Think):** Antarmuka Tkinter dirancang brutalist dan masif. Satpam atau operator tidak perlu membaca teks kecil. Warna layar merah (Anomali) atau hijau (Aman) memberikan umpan balik seketika.
+- **Steve Krug's 1st Law (Don't Make Me Think):** Antarmuka Tkinter dirancang brutalist dan masif menggunakan estetika *"Executive Slate"*. Manajer atau satpam tidak perlu menebak apa yang terjadi. UI memberikan *Semantic Feedback* eksplisit: `ASSET TAKEN` (Merah) atau `ASSET RETURNED` (Hijau).
 - **SICP (Procedural Abstraction):** Akses ke *hardware* kamera diabstraksikan melalui OS Shell (`subprocess.run`), memisahkan kompleksitas *driver* kamera dari logika Python murni.
 
 ---
@@ -38,15 +39,16 @@ CCTV konvensional merekam video 24/7, memaksa manajemen untuk membuang waktu ber
 
 ### Langkah 1: Aktivasi Kamera CSI
 Kamera pita Raspberry Pi memerlukan aktivasi pada tingkat sistem operasi (Raspberry Pi OS versi Bullseye/Bookworm).
+
 ```bash
 sudo raspi-config
 ```
 
-Pilih `3 Interface Options` $\rightarrow$ `I1 Legacy Camera` (atau sesuaikan dengan konfigurasi `libcamera` pada OS terbaru Anda) $\rightarrow$ **Enable**. Kemudian `reboot`.
+Pilih 3 Interface Options $\rightarrow$ I1 Legacy Camera (atau sesuaikan dengan konfigurasi libcamera pada OS terbaru Anda) $\rightarrow$ Enable. Kemudian reboot.
 
 ### Langkah 2: Instalasi Dependensi Terisolasi
 
-Gunakan Virtual Environment untuk mematuhi prinsip *Sandboxing*:
+Gunakan Virtual Environment untuk mematuhi prinsip Sandboxing:
 
 ```bash
 sudo apt-get update
@@ -62,9 +64,9 @@ pip install -r requirements.txt
 
 ### Langkah 3: Injeksi Kredensial (Design by Contract)
 
-Buat file `.env` di *root* direktori `3_ai_camera_pi3_desktop/`. Sistem dirancang untuk *Fail-Fast* dan akan *crash* saat *booting* jika file ini tidak lengkap.
+Buat file .env di root direktori 3_ai_camera_pi3_desktop/. Sistem dirancang untuk Fail-Fast dan akan crash saat booting jika file ini tidak lengkap.
 
-```env
+```bash
 SUPABASE_URL="https://[PROJECT_ID].supabase.co"
 SUPABASE_KEY="eyJh...[ANON_KEY]..."
 TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
@@ -78,16 +80,10 @@ TELEGRAM_CHAT_ID="-1001234567890"
 python3 main.py
 ```
 
-Aplikasi akan mengambil alih layar penuh (*fullscreen*). Untuk keluar dari mode kiosk selama pengembangan, klik tombol **"EXIT UI"** di bagian bawah layar.
-
----
+Aplikasi akan mengambil alih layar penuh (fullscreen). Untuk keluar dari mode kiosk selama pengembangan, klik tombol "EXIT SECURE VIEW" di bagian bawah layar.
 
 ## 📡 Mekanisme Notifikasi Telegram
 
-Ketika anomali terdeteksi (contoh: berat yang dikembalikan tidak sesuai dengan batas toleransi aset), kelas `TelegramNotifier` akan menyatukan ID RFID, $\Delta$ Berat, dan foto *snapshot* ke dalam satu muatan HTTP POST.
-
-Notifikasi akan masuk ke grup Telegram manajemen secara *real-time*, memberikan visibilitas instan kepada eksekutif yang sedang berada di luar area fasilitas.
+Ketika anomali terdeteksi (contoh: berat yang dikembalikan tidak sesuai dengan batas toleransi aset), kelas TelegramNotifier akan menyatukan ID RFID, $\Delta$ Berat, Nama Lengkap, dan foto snapshot ke dalam satu muatan HTTP POST.Notifikasi akan masuk ke grup Telegram manajemen secara real-time, memberikan visibilitas instan kepada eksekutif yang sedang berada di luar area fasilitas tanpa perlu repot membuka dashboard jika sedang sibuk.Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).
 
 ---
-
-*Dokumen ini dikompilasi berdasarkan filosofi engineering tingkat lanjut (SICP, CLRS, Pragmatic Programmer, DOET, & Krug's Laws).*

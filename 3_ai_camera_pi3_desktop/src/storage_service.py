@@ -29,19 +29,16 @@ class StorageService:
                 file_options={"content-type": "image/jpeg", "x-upsert": "true"}
             )
 
-            # 2. Dapatkan Tautan Resolusi Publik
-            public_url = self.supabase.storage.from_(self.bucket_name).get_public_url(file_name)
-
-            # 3. Update Database (Zero-Trust RPC)
-            # Mengeliminasi blokade RLS yang membatasi hak akses 'anon'
+            # ZERO-TRUST: Kita TIDAK mengambil public_url. 
+            # Kita hanya melempar file_name ke DB agar Dashboard membuat Signed URL.
             self.supabase.rpc("secure_attach_evidence", {
                 "p_transaction_id": transaction_id,
-                "p_url": public_url,
-                "p_token": "secret_esp32_hmac_token" # Sesuai dengan Token Arsitektur kita
+                "p_url": file_name, 
+                "p_token": Config.GATEWAY_TOKEN # Membaca dari environment
             }).execute()
 
-            print(f"[Storage Success] Bukti forensik diamankan: {public_url}")
-            return public_url
+            print(f"[Storage Success] Bukti forensik diamankan: {file_name}")
+            return file_name # Mengembalikan path untuk Telegram (opsional)
 
         except Exception as e:
             print(f"[Storage Error] Gagal mengamankan bukti visual: {e}")
