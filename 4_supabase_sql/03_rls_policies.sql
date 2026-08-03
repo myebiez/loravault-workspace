@@ -35,10 +35,12 @@ CREATE POLICY "Command Center read loans" ON active_loans FOR SELECT TO anon, au
 -- ==============================================================================
 -- 3. VISUAL AUDIT STORAGE POLICIES (PI 3 CAMERA)
 -- ==============================================================================
--- Inisialisasi Bucket Publik untuk menyimpan bukti foto dari Pi 3
+-- Inisialisasi Bucket PRIVATE untuk menyimpan bukti foto dari Pi 3.
+-- Menggunakan metode "Infrastructure as Code" (IaC) yang memastikan 
+-- jika bucket sudah ada sebagai public, ia akan ditimpa menjadi private.
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('audit_snapshots', 'audit_snapshots', true) 
-ON CONFLICT (id) DO NOTHING;
+VALUES ('audit_snapshots', 'audit_snapshots', false) 
+ON CONFLICT (id) DO UPDATE SET public = false;
 
 -- Mengunci akses objek storage (Secure by default)
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -50,7 +52,8 @@ ON storage.objects FOR INSERT
 TO anon, authenticated 
 WITH CHECK (bucket_id = 'audit_snapshots');
 
--- Policy 2: Mengizinkan Dasbor Next.js untuk membaca (SELECT) foto publik
+-- Policy 2: Mengizinkan Dasbor Next.js untuk membaca (SELECT) foto
+-- Dasbor akan menggunakan metode Signed URL untuk bypass akses publik
 CREATE POLICY "Dashboard can view snapshots" 
 ON storage.objects FOR SELECT 
 TO anon, authenticated 
